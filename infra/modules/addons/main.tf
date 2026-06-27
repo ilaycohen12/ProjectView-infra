@@ -20,6 +20,7 @@ resource "helm_release" "alb_controller" {
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
   version    = "1.7.1"
+  wait       = false
 
   set {
     name  = "clusterName"
@@ -50,6 +51,7 @@ resource "helm_release" "eso" {
   namespace        = "external-secrets"
   version          = "0.9.11"
   create_namespace = true
+  wait             = false
 
   set {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
@@ -65,7 +67,7 @@ resource "helm_release" "argocd" {
   namespace        = "argocd"
   version          = "6.7.3"
   create_namespace = true
-  timeout          = 600
+  wait             = false
 
   set {
     name  = "server.service.type"
@@ -81,6 +83,7 @@ resource "helm_release" "keda" {
   namespace        = "keda"
   version          = "2.13.1"
   create_namespace = true
+  wait             = false
 
   set {
     name  = "serviceAccount.operator.annotations.eks\\.amazonaws\\.com/role-arn"
