@@ -1,20 +1,17 @@
 data "aws_region" "current" {}
 
-# ── Kubernetes Provider ───────────────────────────────────────────────────────
-# Helm provider v3 removed the kubernetes block — configure auth separately here
-provider "kubernetes" {
-  host                   = var.cluster_endpoint
-  cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", var.cluster_name]
+# ── Helm Provider ─────────────────────────────────────────────────────────────
+provider "helm" {
+  kubernetes {
+    host                   = var.cluster_endpoint
+    cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", var.cluster_name]
+    }
   }
 }
-
-# ── Helm Provider ─────────────────────────────────────────────────────────────
-# Picks up cluster auth from the kubernetes provider above
-provider "helm" {}
 
 # ── ALB Ingress Controller ────────────────────────────────────────────────────
 resource "helm_release" "alb_controller" {
@@ -24,24 +21,25 @@ resource "helm_release" "alb_controller" {
   namespace  = "kube-system"
   version    = "1.7.1"
 
-  set = [
-    {
-      name  = "clusterName"
-      value = var.cluster_name
-    },
-    {
-      name  = "vpcId"
-      value = var.vpc_id
-    },
-    {
-      name  = "region"
-      value = data.aws_region.current.name
-    },
-    {
-      name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-      value = var.alb_controller_role_arn
-    }
-  ]
+  set {
+    name  = "clusterName"
+    value = var.cluster_name
+  }
+
+  set {
+    name  = "vpcId"
+    value = var.vpc_id
+  }
+
+  set {
+    name  = "region"
+    value = data.aws_region.current.name
+  }
+
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = var.alb_controller_role_arn
+  }
 }
 
 # ── External Secrets Operator ─────────────────────────────────────────────────
@@ -53,12 +51,10 @@ resource "helm_release" "eso" {
   version          = "0.9.11"
   create_namespace = true
 
-  set = [
-    {
-      name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-      value = var.eso_role_arn
-    }
-  ]
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = var.eso_role_arn
+  }
 }
 
 # ── ArgoCD ────────────────────────────────────────────────────────────────────
@@ -70,12 +66,10 @@ resource "helm_release" "argocd" {
   version          = "6.7.3"
   create_namespace = true
 
-  set = [
-    {
-      name  = "server.service.type"
-      value = "LoadBalancer"
-    }
-  ]
+  set {
+    name  = "server.service.type"
+    value = "LoadBalancer"
+  }
 }
 
 # ── KEDA ──────────────────────────────────────────────────────────────────────
@@ -87,10 +81,8 @@ resource "helm_release" "keda" {
   version          = "2.13.1"
   create_namespace = true
 
-  set = [
-    {
-      name  = "serviceAccount.operator.annotations.eks\\.amazonaws\\.com/role-arn"
-      value = var.keda_role_arn
-    }
-  ]
+  set {
+    name  = "serviceAccount.operator.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = var.keda_role_arn
+  }
 }
