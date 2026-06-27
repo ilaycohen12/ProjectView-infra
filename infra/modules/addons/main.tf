@@ -1,18 +1,20 @@
 data "aws_region" "current" {}
 
-# ── Helm Provider ─────────────────────────────────────────────────────────────
-# Tells Terraform how to connect to the EKS cluster to install Helm charts
-provider "helm" {
-  kubernetes {
-    host                   = var.cluster_endpoint
-    cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data) # verifies the cluster identity
-    exec {
-      api_version = "client.authentication.k8s.io/v1beta1"
-      command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", var.cluster_name] # same auth method as kubectl
-    }
+# ── Kubernetes Provider ───────────────────────────────────────────────────────
+# Helm provider v3 no longer accepts a kubernetes block — configure it separately
+provider "kubernetes" {
+  host                   = var.cluster_endpoint
+  cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", var.cluster_name]
   }
 }
+
+# ── Helm Provider ─────────────────────────────────────────────────────────────
+# In Helm provider v3, cluster auth is picked up from the kubernetes provider above
+provider "helm" {}
 
 # ── ALB Ingress Controller ────────────────────────────────────────────────────
 # Watches for Ingress resources and creates real AWS ALBs from them
