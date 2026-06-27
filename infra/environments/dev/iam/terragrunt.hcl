@@ -11,17 +11,41 @@ terraform {
 }
 
 dependency "eks" {
-  config_path = "../eks" # reads eks outputs from S3 state
+  config_path = "../eks"
 
   mock_outputs = {
-    oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/XXXXXXXX" # fake ARN for plan/validate
+    oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/XXXXXXXX"
   }
 
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"] # use mocks only during plan/validate, never during apply
+  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+}
+
+dependency "sqs" {
+  config_path = "../sqs"
+
+  mock_outputs = {
+    signed_queue_arn = "arn:aws:sqs:us-east-1:123456789012:projectview-dev-signed"
+    free_queue_arn   = "arn:aws:sqs:us-east-1:123456789012:projectview-dev-free"
+  }
+
+  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+}
+
+dependency "s3" {
+  config_path = "../s3"
+
+  mock_outputs = {
+    bucket_arn = "arn:aws:s3:::projectview-dev-pdfs-123456789012"
+  }
+
+  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
 }
 
 inputs = {
-  env_name          = local.env.locals.env_name       # "dev"
-  cluster_name      = local.env.locals.cluster_name   # "projectview-dev"
-  oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn # real value from eks state during apply
+  env_name          = local.env.locals.env_name
+  cluster_name      = local.env.locals.cluster_name
+  oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
+  signed_queue_arn  = dependency.sqs.outputs.signed_queue_arn
+  free_queue_arn    = dependency.sqs.outputs.free_queue_arn
+  bucket_arn        = dependency.s3.outputs.bucket_arn
 }

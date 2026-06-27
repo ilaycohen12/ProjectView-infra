@@ -119,3 +119,101 @@ resource "aws_iam_role_policy_attachment" "eso" {
   policy_arn = aws_iam_policy.eso.arn  # the policy above
   role       = aws_iam_role.eso.name   # the role above
 }
+
+# ── KEDA ─────────────────────────────────────────────────────────────────────
+# KEDA needs to read queue depth to decide how many worker pods to scale to
+
+resource "aws_iam_role" "keda" {
+  name = "${var.cluster_name}-keda"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = var.oidc_provider_arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${local.oidc_url}:sub" = "system:serviceaccount:keda:keda-operator" # locked to KEDA operator service account
+          "${local.oidc_url}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+
+  tags = { Environment = var.env_name, ManagedBy = "terragrunt" }
+}
+
+resource "aws_iam_policy" "keda" {
+  name = "${var.cluster_name}-keda"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:GetQueueAttributes"] # read queue depth — the only thing KEDA needs
+      Resource = [var.signed_queue_arn]      # only the signed queue — KEDA only watches this one
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "keda" {
+  policy_arn = aws_iam_policy.keda.arn
+  role       = aws_iam_role.keda.name
+}
+
+# ── PDF Worker ────────────────────────────────────────────────────────────────
+# Both signed and free workers share one IAM role — same permissions, different queue URLs via env vars
+
+resource "aws_iam_role" "worker" {
+  name = "${var.cluster_name}-worker"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = var.oidc_provider_arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${local.oidc_url}:sub" = "system:serviceaccount:default:worker" # locked to worker service account
+          "${local.oidc_url}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+
+  tags = { Environment = var.env_name, ManagedBy = "terragrunt" }
+}
+
+resource "aws_iam_policy" "worker" {
+  name = "${var.cluster_name}-worker"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",    # pick up a message from the queue
+          "sqs:DeleteMessage",     # delete it after processing
+          "sqs:GetQueueAttributes" # read queue metadata
+        ]
+        Resource = [var.signed_queue_arn, var.free_queue_arn] # both queues
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject", # upload the generated PDF
+          "s3:GetObject"  # needed to generate presigned download URLs
+        ]
+        Resource = "${var.bucket_arn}/*" # all objects inside the PDF bucket
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker" {
+  policy_arn = aws_iam_policy.worker.arn
+  role       = aws_iam_role.worker.name
+}
