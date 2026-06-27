@@ -1,0 +1,16 @@
+# Terragrunt cache — generated on every run, never commit
+.terragrunt-cache/
+
+# Terraform auto-generated files
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+
+# Files Terragrunt generates inside each module before running
+backend.tf
+provider.tf
+
+# Secrets — never commit
+*.tfvars
+*.tfvars.json
