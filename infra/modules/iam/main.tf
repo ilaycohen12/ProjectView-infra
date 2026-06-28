@@ -255,7 +255,7 @@ resource "aws_iam_role" "worker" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = {
-          "${local.oidc_url}:sub" = "system:serviceaccount:default:worker" # locked to worker service account
+          "${local.oidc_url}:sub" = "system:serviceaccount:dev:pdf-worker-sa" # locked to worker service account in dev namespace
           "${local.oidc_url}:aud" = "sts.amazonaws.com"
         }
       }
@@ -274,8 +274,9 @@ resource "aws_iam_policy" "worker" {
       {
         Effect = "Allow"
         Action = [
-          "sqs:ReceiveMessage",    # pick up a message from the queue
-          "sqs:DeleteMessage",     # delete it after processing
+          "sqs:SendMessage",       # send a job message to the queue (API)
+          "sqs:ReceiveMessage",    # pick up a message from the queue (worker)
+          "sqs:DeleteMessage",     # delete it after processing (worker)
           "sqs:GetQueueAttributes" # read queue metadata
         ]
         Resource = [var.signed_queue_arn, var.free_queue_arn] # both queues

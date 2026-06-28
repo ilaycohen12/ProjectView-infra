@@ -1,3 +1,79 @@
+# ── GitHub Actions OIDC Provider ─────────────────────────────────────────────
+# Allows GitHub Actions to authenticate to AWS without hardcoded access keys.
+# GitHub presents a signed JWT token; AWS verifies it against this OIDC provider.
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"] # GitHub's OIDC cert thumbprint
+}
+
+# ── GitHub Actions CI Role ────────────────────────────────────────────────────
+# This role is assumed by GitHub Actions during CI runs.
+# Trust is locked to the ProjectView repo on the main branch only.
+
+resource "aws_iam_role" "github_actions_ci" {
+  name = "github-actions-ci"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:sub" = "repo:ilaycohen12/ProjectView:ref:refs/heads/main"
+        }
+      }
+    }]
+  })
+
+  tags = { Project = "projectview", ManagedBy = "terragrunt" }
+}
+
+# Policy — CI needs to push images to ECR and restart deployments on EKS
+resource "aws_iam_policy" "github_actions_ci" {
+  name = "github-actions-ci"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"                # authenticate docker to ECR
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:PutImage",                            # push image layers and tag
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer"
+        ]
+        Resource = "arn:aws:ecr:us-east-1:086241318869:repository/projectview-app"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["eks:DescribeCluster"]           # needed for update-kubeconfig
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_ci" {
+  policy_arn = aws_iam_policy.github_actions_ci.arn
+  role       = aws_iam_role.github_actions_ci.name
+}
+
 # ── ECR Repository ───────────────────────────────────────────────────────────
 # One registry shared by both dev and prod clusters
 # NOTE: already created manually in Phase 0 — import with:

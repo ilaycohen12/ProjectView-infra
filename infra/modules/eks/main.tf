@@ -22,6 +22,18 @@ module "eks" {
     }
   }
 
+  access_entries = {
+    github-actions = {
+      principal_arn = "arn:aws:iam::086241318869:role/github-actions-ci"
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
+
   tags = {
     Environment = var.env_name   # "dev" or "prod"
     Project     = "projectview"
