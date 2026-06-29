@@ -19,6 +19,10 @@ if (-not $SkipK8s) {
         kubectl delete ingress --all -n dev 2>$null
         kubectl delete svc --all -n staging 2>$null
         kubectl delete ingress --all -n staging 2>$null
+        kubectl delete svc --all -n argocd 2>$null
+        kubectl delete ingress --all -n argocd 2>$null
+        kubectl delete svc --all -n keda 2>$null
+        kubectl delete svc --all -n external-secrets 2>$null
         Write-Host "    Done."
     } else {
         Write-Host "    Cluster not reachable - skipping." -ForegroundColor Yellow
