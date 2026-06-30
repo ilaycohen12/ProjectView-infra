@@ -8,6 +8,26 @@ include "root" {
 
 terraform {
   source = "../../../modules/addons" # points to infra/modules/addons
+
+  # Delete AWS Load Balancers BEFORE terraform destroy runs.
+  # ALBs are created by the ALB controller (outside Terraform state). If they're
+  # not deleted before the EKS cluster is torn down, the VPC deletion will fail
+  # because orphaned ALBs/security-groups still reference the VPC subnets.
+  before_hook "delete_load_balancers" {
+    commands = ["destroy"]
+    execute = [
+      "bash", "-c",
+      join(" && ", [
+        "echo 'Deleting LoadBalancer services to trigger ALB cleanup...'",
+        "aws eks update-kubeconfig --region us-east-1 --name snapdf-${local.env.locals.env_name} 2>/dev/null || true",
+        "kubectl delete svc ingress-nginx-controller -n ingress-nginx --ignore-not-found 2>/dev/null || true",
+        "kubectl delete svc argocd-server -n argocd --ignore-not-found 2>/dev/null || true",
+        "echo 'Waiting 90s for AWS to finish deleting ALBs...'",
+        "sleep 90",
+        "echo 'Proceeding with terraform destroy.'"
+      ])
+    ]
+  }
 }
 
 dependency "vpc" {

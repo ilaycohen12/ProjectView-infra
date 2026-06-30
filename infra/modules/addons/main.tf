@@ -20,7 +20,8 @@ resource "helm_release" "alb_controller" {
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
   version    = "1.7.1"
-  wait       = false
+  wait       = true    # must be ready before other charts trigger its webhook
+  timeout    = 300
 
   set {
     name  = "clusterName"
@@ -52,6 +53,7 @@ resource "helm_release" "eso" {
   version          = "0.9.11"
   create_namespace = true
   wait             = false
+  depends_on       = [helm_release.alb_controller]
 
   set {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
@@ -68,6 +70,7 @@ resource "helm_release" "argocd" {
   version          = "6.7.3"
   create_namespace = true
   wait             = false
+  depends_on       = [helm_release.alb_controller]
 
   set {
     name  = "server.service.type"
@@ -84,10 +87,17 @@ resource "helm_release" "nginx" {
   version          = "4.10.1"
   create_namespace = true
   wait             = false
+  depends_on       = [helm_release.alb_controller]
 
   set {
     name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
     value = "internet-facing"
+  }
+
+  # Disabled: the admission-patch Job can't schedule on small clusters (pod limit)
+  set {
+    name  = "controller.admissionWebhooks.enabled"
+    value = "false"
   }
 }
 
@@ -100,6 +110,7 @@ resource "helm_release" "keda" {
   version          = "2.13.1"
   create_namespace = true
   wait             = false
+  depends_on       = [helm_release.alb_controller]
 
   set {
     name  = "serviceAccount.operator.annotations.eks\\.amazonaws\\.com/role-arn"
