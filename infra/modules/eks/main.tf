@@ -15,10 +15,10 @@ module "eks" {
   eks_managed_node_groups = {
     default = {
       name           = "${var.cluster_name}-nodes"  # e.g. "snapdf-dev-nodes"
-      instance_types = [var.node_instance_type]     # ["t3.small"]
+      instance_types = [var.node_instance_type]     # ["t3.medium"]
       min_size       = 1                            # never go below 1 node
       max_size       = 3                            # can scale up to 3 under load
-      desired_size   = 2                            # start with 2 nodes — one per AZ
+      desired_size   = 2                            # 2 nodes is enough for t3.medium
     }
   }
 

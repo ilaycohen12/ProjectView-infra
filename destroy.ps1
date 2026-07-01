@@ -117,6 +117,6 @@ if ($VPC_ID -eq "None" -or [string]::IsNullOrEmpty($VPC_ID)) {
 Write-Host "`n=== Step 6: Destroy all infrastructure ===" -ForegroundColor Cyan
 Write-Host "    Using --lock=false to prevent stuck locks on DNS failure"
 Set-Location infra/environments/dev
-terragrunt run-all destroy --lock=false
+terragrunt run-all destroy --lock=false --terragrunt-non-interactive
 
 Write-Host "`n=== Done ===" -ForegroundColor Green
